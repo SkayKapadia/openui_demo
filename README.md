@@ -54,7 +54,7 @@ The default model is `anthropic/claude-haiku-5.5` (about $0.002 per chat answer;
 
 | Piece | File | Notes |
 |---|---|---|
-| Schema | `db/schema.sql` | `countries`, `indicators`, `observations`, `dashboards` |
+| Schema | `db/schema.sql` | `countries`, `indicators`, `observations`, `dashboards`, `chat_usage` |
 | Docker init | `db/init/01_init.sh` | Schema and the two app roles, on first start |
 | Loader | `scripts/load-worldbank.mts` | Idempotent upserts. Edit `scripts/worldbank-catalog.mts` to add countries or indicators |
 | Dashboard data tools | `src/lib/data-tools.ts` | `get_series`, `compare_series`, `get_comparison`, `get_snapshot`: fixed SQL, lenient arguments, flat results that bind directly |
@@ -69,11 +69,18 @@ The default model is `anthropic/claude-haiku-5.5` (about $0.002 per chat answer;
 The code only reads connection strings, so any Postgres works:
 
 ```bash
-DATABASE_URL_ADMIN=<hosted-url> STORE_PASSWORD=<password> npm run db:schema
+DATABASE_URL_ADMIN=<hosted-url> READER_PASSWORD=<password> STORE_PASSWORD=<password> npm run db:schema
 DATABASE_URL_ADMIN=<hosted-url> npm run load:worldbank
 ```
 
-Then set `DATABASE_URL` (a read-only user), `DATABASE_URL_STORE` (the `dashboard_store` user) and `OPENROUTER_API_KEY` in your host's environment settings.
+`db:schema` creates both app roles when `READER_PASSWORD` and `STORE_PASSWORD` are set. Then set these in your host's environment settings:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | The hosted connection string, as the `dashboard_reader` user |
+| `DATABASE_URL_STORE` | The same, as the `dashboard_store` user |
+| `OPENROUTER_API_KEY` | Your key. Give it a small credit limit |
+| `CHAT_DAILY_LIMIT_PER_CLIENT`, `CHAT_DAILY_LIMIT_TOTAL` | Optional daily question limits for a public demo, counted in Postgres |
 
 ## Scripts
 

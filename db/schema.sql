@@ -49,3 +49,12 @@ CREATE TABLE IF NOT EXISTS dashboards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Daily request counts for the public demo's usage limit.
+-- `client` is a salted hash of the caller's IP address, never the address itself.
+CREATE TABLE IF NOT EXISTS chat_usage (
+  day    DATE    NOT NULL,
+  client TEXT    NOT NULL,
+  count  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, client)
+);

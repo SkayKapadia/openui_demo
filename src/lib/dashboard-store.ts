@@ -8,7 +8,7 @@ import { Pool } from "pg";
  */
 const globalForPg = globalThis as unknown as { pgStorePool?: Pool };
 
-const pool =
+export const storePool =
   globalForPg.pgStorePool ??
   new Pool({
     connectionString: process.env.DATABASE_URL_STORE,
@@ -16,7 +16,7 @@ const pool =
     ssl: process.env.DATABASE_URL_STORE?.includes("localhost") ? undefined : { rejectUnauthorized: false },
   });
 
-if (process.env.NODE_ENV !== "production") globalForPg.pgStorePool = pool;
+if (process.env.NODE_ENV !== "production") globalForPg.pgStorePool = storePool;
 
 export type Dashboard = {
   id: string;
@@ -39,7 +39,7 @@ export async function saveDashboard(input: {
   model?: string;
 }): Promise<Dashboard> {
   const id = input.id ?? randomBytes(6).toString("base64url");
-  const { rows } = await pool.query<Dashboard>(
+  const { rows } = await storePool.query<Dashboard>(
     `INSERT INTO dashboards (id, title, prompt, source, model) VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (id) DO UPDATE
        SET title = EXCLUDED.title, prompt = EXCLUDED.prompt, source = EXCLUDED.source,
@@ -51,12 +51,12 @@ export async function saveDashboard(input: {
 }
 
 export async function getDashboard(id: string): Promise<Dashboard | null> {
-  const { rows } = await pool.query<Dashboard>(`SELECT ${COLUMNS} FROM dashboards WHERE id = $1`, [id]);
+  const { rows } = await storePool.query<Dashboard>(`SELECT ${COLUMNS} FROM dashboards WHERE id = $1`, [id]);
   return rows[0] ?? null;
 }
 
 export async function listDashboards(): Promise<Omit<Dashboard, "source">[]> {
-  const { rows } = await pool.query<Dashboard>(
+  const { rows } = await storePool.query<Dashboard>(
     `SELECT id, title, prompt, model, created_at AS "createdAt", updated_at AS "updatedAt"
        FROM dashboards ORDER BY updated_at DESC LIMIT 100`,
   );

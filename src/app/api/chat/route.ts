@@ -1,17 +1,23 @@
 import { systemPrompt } from "@/lib/system-prompt";
 import { chatModel } from "@/lib/llm";
 import { chatTools } from "@/lib/tools";
+import { overLimit } from "@/lib/usage-limit";
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
 
 // pg needs the Node.js runtime, not Edge.
 export const runtime = "nodejs";
+// Generating a live dashboard takes about 30 seconds.
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   if (!process.env.OPENROUTER_API_KEY) {
-    return new Response("OPENROUTER_API_KEY is not set. Add it to .env and restart the dev server.", {
+    return new Response("OPENROUTER_API_KEY is not set on the server.", {
       status: 500,
     });
   }
+
+  const limited = await overLimit(req);
+  if (limited) return new Response(limited, { status: 429 });
 
   const { messages } = await req.json();
 

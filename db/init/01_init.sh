@@ -23,5 +23,6 @@ CREATE ROLE dashboard_store LOGIN PASSWORD :'store_pw';
 GRANT CONNECT ON DATABASE :"db" TO dashboard_store;
 GRANT USAGE ON SCHEMA public TO dashboard_store;
 GRANT SELECT, INSERT, UPDATE, DELETE ON dashboards TO dashboard_store;
+GRANT SELECT, INSERT, UPDATE ON chat_usage TO dashboard_store;
 ALTER ROLE dashboard_store SET statement_timeout = '5s';
 SQL
