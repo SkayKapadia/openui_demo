@@ -4,6 +4,10 @@ Ask questions about India's development data and get **generated dashboards**, i
 
 > Data: [World Bank World Development Indicators](https://data.worldbank.org/), CC BY 4.0. No API key needed.
 
+![A generated live dashboard: India's infrastructure, with a start-year filter. The header reads "Live from Postgres" and "3 queries, 0 LLM calls".](docs/live-dashboard.png)
+
+*A dashboard the model generated once. It is stored in Postgres and loads its data with three SQL-backed queries and no model call.*
+
 ## Self-hosted live dashboards
 
 This is a self-hosted take on a dashboard API, in answer to [thesysdev/openui#1635](https://github.com/thesysdev/openui/issues/1635): the dashboard is generated once, stored in Postgres, and from then on loads its own data from Postgres with **no LLM call**.
@@ -53,7 +57,7 @@ The default model is `anthropic/claude-haiku-5.5` (about $0.002 per chat answer;
 | Schema | `db/schema.sql` | `countries`, `indicators`, `observations`, `dashboards` |
 | Docker init | `db/init/01_init.sh` | Schema and the two app roles, on first start |
 | Loader | `scripts/load-worldbank.mts` | Idempotent upserts. Edit `scripts/worldbank-catalog.mts` to add countries or indicators |
-| Dashboard data tools | `src/lib/data-tools.ts` | `get_series`, `get_comparison`, `get_snapshot`: fixed SQL, lenient arguments, flat results that bind directly |
+| Dashboard data tools | `src/lib/data-tools.ts` | `get_series`, `compare_series`, `get_comparison`, `get_snapshot`: fixed SQL, lenient arguments, flat results that bind directly |
 | Browser data endpoint | `src/app/api/tools/route.ts` | `{ name, args }` → `{ result }`. Named tools only, no SQL in the request |
 | Generation | `src/lib/dashboard-generator.ts` | OpenUI's prompt with `tools`, `toolCalls` and `bindings`; validated with `createParser`; one repair attempt |
 | Storage | `src/lib/dashboard-store.ts` | Saved OpenUI Lang programs in Postgres |
@@ -84,7 +88,7 @@ Then set `DATABASE_URL` (a read-only user), `DATABASE_URL_STORE` (the `dashboard
 
 ## Known limits
 
-- **Missing values inside a line chart are drawn as 0** by OpenUI's charts ([#1611](https://github.com/thesysdev/openui/issues/1611)). The data tools avoid trailing gaps, but an indicator with gaps in the middle (adult literacy) still shows dips.
+- **Missing values in a line chart are drawn as 0** by OpenUI's charts ([#1611](https://github.com/thesysdev/openui/issues/1611)), including a series that ends before the others. The data tools work around it: `get_series` ends at the country's last year with data, and `compare_series` ends every country at the last year they all share. An indicator with gaps in the middle (adult literacy) still shows dips.
 - **Chart series colours are close together**, so several countries on one chart are hard to tell apart ([#1602](https://github.com/thesysdev/openui/issues/1602)).
 - There is no sign-in: every saved dashboard is visible to anyone who can open the app.
 

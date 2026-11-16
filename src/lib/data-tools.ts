@@ -69,7 +69,7 @@ async function countryName(c: string) {
 export const dataTools: Record<string, DataTool> = {
   get_series: {
     description:
-      "Yearly values of ONE indicator for ONE country. `labels` (years as strings) and `values` are aligned and cover every year from startYear to endYear, with null where there is no data. Call it once per country to compare countries on one chart: the labels line up when startYear and endYear match.",
+      "Yearly values of ONE indicator for ONE country, for a single-country chart and KPI values. `labels` (years as strings) and `values` are aligned, from startYear to the country's latest year with data. To put several countries on one chart, use compare_series instead.",
     inputSchema: {
       type: "object",
       properties: {
@@ -98,12 +98,12 @@ export const dataTools: Record<string, DataTool> = {
       const indicator = code(args.indicator, INDICATOR, "NY.GDP.PCAP.CD");
       const country = code(args.country, COUNTRY, "IND");
       const start = year(args.startYear, 2000);
+      // End at this country's own last year with data. OpenUI charts draw a
+      // missing trailing value as 0 (thesysdev/openui#1611), which looks like a crash.
       const [{ max }] = await query<{ max: number | null }>(
-        "SELECT max(year) FROM observations WHERE indicator_code = $1",
-        [indicator],
+        "SELECT max(year) FROM observations WHERE indicator_code = $1 AND country_code = $2",
+        [indicator, country],
       );
-      // Never run past the indicator's last year with data: OpenUI charts draw a
-      // trailing null as 0 (thesysdev/openui#1611), which looks like a crash to zero.
       const lastWithData = max ?? new Date().getFullYear();
       const end = Math.max(start, Math.min(year(args.endYear, lastWithData), lastWithData));
 
@@ -138,6 +138,78 @@ export const dataTools: Record<string, DataTool> = {
           first && latest && first.value !== 0
             ? Number((((latest.value - first.value) / Math.abs(first.value)) * 100).toFixed(1))
             : null,
+      };
+    },
+  },
+
+  compare_series: {
+    description:
+      "Yearly values of ONE indicator for SEVERAL countries, ready for one line chart. All series share `labels` and end at the latest year for which every requested country has data, so no line is cut short. `series` has one entry per country.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        indicator: { type: "string", description: "Indicator code, e.g. SP.DYN.LE00.IN" },
+        countries: {
+          type: "array",
+          items: { type: "string" },
+          description: "ISO3 codes, 2 to 8 of them, e.g. [\"IND\", \"CHN\"].",
+        },
+        startYear: { type: "number", description: "First year, 1960 or later. Default 2000." },
+      },
+      required: ["indicator", "countries"],
+    },
+    example: {
+      indicator: "SP.DYN.LE00.IN",
+      name: "Life expectancy at birth, total (years)",
+      unit: "years",
+      labels: ["2022", "2023", "2024"],
+      series: [
+        { country: "IND", countryName: "India", values: [71.7, 72, 72.2], latestValue: 72.2 },
+        { country: "CHN", countryName: "China", values: [77.6, 77.8, 78], latestValue: 78 },
+      ],
+      latestYear: "2024",
+    },
+    execute: async (args) => {
+      const indicator = code(args.indicator, INDICATOR, "NY.GDP.PCAP.CD");
+      const countries = codes(args.countries, COUNTRY, ["IND", "CHN"]);
+      const start = year(args.startYear, 2000);
+
+      const [meta, names, rows] = await Promise.all([
+        indicatorMeta(indicator),
+        query<{ code: string; name: string }>("SELECT code, name FROM countries WHERE code = ANY($1)", [countries]),
+        query<Obs & { country_code: string }>(
+          `SELECT country_code, year, value FROM observations
+            WHERE indicator_code = $1 AND country_code = ANY($2) AND year >= $3
+            ORDER BY year`,
+          [indicator, countries, start],
+        ),
+      ]);
+
+      // Keep only countries that have data, and stop at the last year they all share.
+      const present = countries.filter((c) => rows.some((r) => r.country_code === c));
+      const lastYears = present.map((c) => Math.max(...rows.filter((r) => r.country_code === c).map((r) => r.year)));
+      const end = lastYears.length ? Math.min(...lastYears) : start;
+      const years = Array.from({ length: Math.max(0, end - start) + 1 }, (_, i) => start + i);
+      const value = new Map(rows.map((r) => [`${r.country_code}:${r.year}`, r.value]));
+
+      return {
+        indicator,
+        name: meta.name,
+        unit: meta.unit,
+        labels: years.map(String),
+        series: present.map((c) => {
+          const values = years.map((y) => {
+            const v = value.get(`${c}:${y}`);
+            return v === undefined ? null : round(v);
+          });
+          return {
+            country: c,
+            countryName: names.find((n) => n.code === c)?.name ?? c,
+            values,
+            latestValue: values[values.length - 1],
+          };
+        }),
+        latestYear: String(end),
       };
     },
   },
