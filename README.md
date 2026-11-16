@@ -2,6 +2,8 @@
 
 Ask questions about India's development data and get **generated dashboards**, including **live dashboards that are saved in your own Postgres and load fresh data every time they open**. Built with the open-source [OpenUI](https://openui.com) packages. No hosted dashboard service is involved.
 
+**Live demo: https://openui-demo.vercel.app** · sample live dashboard: [/d/country-profile](https://openui-demo.vercel.app/d/country-profile)
+
 > Data: [World Bank World Development Indicators](https://data.worldbank.org/), CC BY 4.0. No API key needed.
 
 ![A generated live dashboard: India's infrastructure, with a start-year filter. The header reads "Live from Postgres" and "3 queries, 0 LLM calls".](docs/live-dashboard.png)
